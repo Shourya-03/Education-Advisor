@@ -1,47 +1,32 @@
 import { useState, useEffect } from 'react';
+import { setItem, getItem } from '../services/storageService';
 
 const useOfflineStorage = (key, initialValue) => {
-  const [storedValue, setStoredValue] = useState(() => {
-    try {
-      if (typeof window !== 'undefined') {
-        const item = window.localStorage.getItem(key);
-        return item ? JSON.parse(item) : initialValue;
-      }
-      return initialValue;
-    } catch (error) {
-      console.error('Error reading from localStorage:', error);
-      return initialValue;
-    }
-  });
+  const [storedValue, setStoredValue] = useState(initialValue);
 
-  const setValue = (value) => {
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const item = await getItem(key);
+        if (item) {
+          setStoredValue(item);
+        }
+      } catch (error) {
+        console.error('Error reading from IndexedDB:', error);
+      }
+    };
+    loadData();
+  }, [key]);
+
+  const setValue = async (value) => {
     try {
       const valueToStore = value instanceof Function ? value(storedValue) : value;
       setStoredValue(valueToStore);
-      
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem(key, JSON.stringify(valueToStore));
-        
-        // Also store in IndexedDB for larger data if needed
-        if (valueToStore && typeof valueToStore === 'object' && Object.keys(valueToStore).length > 10) {
-          // IndexedDB storage implementation would go here
-        }
-      }
+      await setItem(key, valueToStore);
     } catch (error) {
-      console.error('Error saving to localStorage:', error);
+      console.error('Error saving to IndexedDB:', error);
     }
   };
-
-  useEffect(() => {
-    const handleStorageChange = (e) => {
-      if (e.key === key && e.newValue) {
-        setStoredValue(JSON.parse(e.newValue));
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, [key]);
 
   return [storedValue, setValue];
 };
